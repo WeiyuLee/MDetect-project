@@ -14,6 +14,7 @@ def load_pickle_data(datasetroot):
     image_data = []
     code_data = []
     check_list_data = []
+    meta_data = []
     
     data_list = os.listdir(datasetroot)
     
@@ -22,22 +23,26 @@ def load_pickle_data(datasetroot):
         curr_image = pickle.load(f)
         curr_code = pickle.load(f)
         curr_list = pickle.load(f)
+        curr_meta = pickle.load(f)
         f.close()
         
         image_data.append(curr_image)
         code_data.append(curr_code)
         check_list_data.append(curr_list)
+        meta_data.append(curr_meta)
     
     # code_data.shape = (?, 64, 64, 4)
-    return image_data, code_data, check_list_data   
+    return image_data, code_data, check_list_data, meta_data   
 
-def classify_data(image_data, code_data, check_list_data, datasetroot):
+def classify_data(image_data, code_data, check_list_data, meta_data, datasetroot):
     
     normal_image_data = []
     normal_code_data = []
+    normal_meta_data = []
     abnormal_image_data = []
     abnormal_code_data = []
-
+    abnormal_meta_data = []
+    
     ab_count = 0
     total_ab_count = 0
     
@@ -49,15 +54,22 @@ def classify_data(image_data, code_data, check_list_data, datasetroot):
         
         ab_idx = np.nonzero(curr_list)[0]
 
+        #print(curr_list)
+        #print(np.array(image_data).shape)
+        #print(np.array(code_data).shape)
+        #print(len(meta_data))
+
         for p_idx in range(len(curr_list)):
             if p_idx in ab_idx:
                 abnormal_image_data.append(image_data[i_idx][p_idx])
                 abnormal_code_data.append(code_data[i_idx][p_idx])
+                abnormal_meta_data.append(meta_data[i_idx][p_idx])
                 ab_count += 1
             else:
                 normal_image_data.append(image_data[i_idx][p_idx])
                 normal_code_data.append(code_data[i_idx][p_idx])             
-
+                normal_meta_data.append(meta_data[i_idx][p_idx])
+                
         print("File: {}, abnormal patch count: {}".format(data_list[i_idx], ab_count))        
         print(ab_idx)
         total_ab_count += ab_count
@@ -65,7 +77,25 @@ def classify_data(image_data, code_data, check_list_data, datasetroot):
 
     print("Total abnormal patch count: {}".format(total_ab_count))
                                 
-    return normal_image_data, normal_code_data, abnormal_image_data, abnormal_code_data
+    return normal_image_data, normal_code_data, normal_meta_data, abnormal_image_data, abnormal_code_data, abnormal_meta_data
+
+def normalize_data(image_data, code_data):
+    
+    image_data = np.array(image_data)
+    code_data = np.array(code_data)
+    
+    image_mean = np.mean(image_data)
+    image_std = np.std(image_data)
+    
+    code_mean = np.mean(code_data)
+    code_std = np.std(code_data)
+    
+    image_data = (image_data - image_mean) / image_std
+    code_data = (code_data - code_mean) / code_std
+    
+    normalize_meta_data = [("image", image_mean, image_std), ("code", code_mean, code_std)]
+    
+    return image_data, code_data, normalize_meta_data
 
 def aug_data(image_data, code_data):
     
@@ -105,14 +135,19 @@ def aug_data(image_data, code_data):
         
 def main_process():
     
-    pickle_import_dir = "/home/sdc1/dataset/ICPR2012/training_data/scanner_A/label_code/"    
-    output_dir = "./classfied_data/"
+    pickle_import_dir = "/home/sdc1/dataset/ICPR2012/training_data/scanner_A/label_code/224x224"    
+    output_dir = "/home/sdc1/dataset/ICPR2012/training_data/scanner_A/classfied_data/"
+#    pickle_import_dir = "/home/sdc1/dataset/ICPR2012/testing_data/scanner_A/label_code/"    
+#    output_dir = "/home/sdc1/dataset/ICPR2012/testing_data/scanner_A/classfied_data/"
     
     print("Loading data...")
-    image_data, code_data, check_list_data = load_pickle_data(pickle_import_dir)
+    image_data, code_data, check_list_data, meta_data = load_pickle_data(pickle_import_dir)
+    
+    print("Normalizing data...")
+    image_data, code_data, normalize_meta_data = normalize_data(image_data, code_data)
     
     print("Classifying data...")
-    n_image, n_code, ab_image, ab_code = classify_data(image_data, code_data, check_list_data, pickle_import_dir)
+    n_image, n_code, n_meta, ab_image, ab_code, ab_meta = classify_data(image_data, code_data, check_list_data, meta_data, pickle_import_dir)
     
 #    print("Data augmentation...")
 #    ab_image, ab_code = aug_data(ab_image, ab_code)
@@ -127,11 +162,15 @@ def main_process():
     f = open(output_dir + "normal_data.pkl", 'wb')
     pickle.dump(n_image, f, True)
     pickle.dump(n_code, f, True)
+    pickle.dump(n_meta, f, True)    
+    pickle.dump(normalize_meta_data, f, True)    
     f.close()
 
     f = open(output_dir + "abnormal_data.pkl", 'wb')
     pickle.dump(ab_image, f, True)
     pickle.dump(ab_code, f, True)
+    pickle.dump(ab_meta, f, True)    
+    pickle.dump(normalize_meta_data, f, True)    
     f.close()
     
 if __name__ == '__main__':

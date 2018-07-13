@@ -83,16 +83,19 @@ class config:
 	# Autoencoder model config
 	def AE_baseline_model(self):
 
+		####################################
+		#             Training             #
+		####################################        
 		train_config = self.config["train"]
 
 		train_config["mode"] = "autoencoder" 
-		train_config["iteration"] = 1200000 
-		train_config["curr_iteration"] = 697001 
-		train_config["batch_size"] = 32 
+		train_config["iteration"] = 8000000 
+		train_config["curr_iteration"] = 4783501
+		train_config["batch_size"] = 16 
 		train_config["image_size"] = 256
 #		train_config["project_image_size"] = 2 * round( math.sqrt((train_config["image_size"]/2)**2 + (train_config["image_size"]/2)**2) ) + 1
 		train_config["project_image_size"] = 384        
-		train_config["learning_rate"] = 1e-4 
+		train_config["learning_rate"] = 1e-4/2 
 		train_config["checkpoint_dir"] = "/home/sdc1/model/MDetection/autoencoder_model" 
 		train_config["log_dir"] = "/home/sdc1/model/MDetection/autoencoder_model/log/" #Name of checkpoint directory [checkpoint]
 		train_config["output_dir"] = "output" # Name of sample directory [output]
@@ -123,8 +126,8 @@ class config:
 #		train_config["ckpt_name"] = "baseline_v5_encdec"           
 #		train_config["ckpt_name"] = "baseline_v5_encdec_64x64"            
 #		train_config["ckpt_name"] = "baseline_v5_encdec_64x64_relu"        
-		train_config["ckpt_name"] = "baseline_v5_encdec_flatten"          
-#		train_config["ckpt_name"] = "baseline_v5_encdec_flatten_batch_16_code_64x64"        
+#		train_config["ckpt_name"] = "baseline_v5_encdec_flatten"          
+		train_config["ckpt_name"] = "baseline_v5_encdec_flatten_batch_16_code_64x64"        
 		train_config["is_train"] = True # True for training, False for testing [True]
 #		train_config["model_ticket"] = "baseline" # Name of checkpoints
 #		train_config["model_ticket"] = "baseline_v2" # Name of checkpoints        
@@ -133,54 +136,93 @@ class config:
 #		train_config["model_ticket"] = "baseline_v5" # Name of checkpoints                                  
 		train_config["model_ticket"] = "baseline_v5_flatten" # Name of checkpoints                                          
 
+		####################################
+		#            Evaluation            #
+		####################################
+
 		eval_config = self.config["evaluation"]
+
 		eval_config["mode"] = 'encode'        
 #		eval_config["mode"] = 'decode'                
-		eval_config["inputroot"] = '/home/sdc1/dataset/ICPR2012/training_data/scanner_A/bmp/'        
-		eval_config["labelroot"] = '/home/sdc1/dataset/ICPR2012/training_data/scanner_A/label_plot/'        
-		eval_config["coderoot"] = '/home/sdc1/dataset/ICPR2012/training_data/scanner_A/label_code/'                
-		eval_config["image_size"] = 256
+        
+#		eval_config["sample_mode"] = 'split'                
+		eval_config["sample_mode"] = 'random'                        
+        
+		eval_config["aug"] = True   
+#		eval_config["aug"] = False                                
+
+		eval_config["image_size"] = 224
 		eval_config["project_image_size"] = 384
-		eval_config["code_size"] = [64,64,4]       
-		eval_config["model_ticket"] = "baseline_v5" 
-		eval_config["ckpt_file"] = "/home/wei/ML/model/MDetection/autoencoder_model/baseline/baseline_v5_encdec_64x64_relu-104600" 
-		eval_config["enc_output_dir"] = "./enc_output/" 
+		eval_config["code_size"] = [64,64,1]       
+		eval_config["model_ticket"] = "baseline_v5_flatten" 
+		eval_config["ckpt_file"] = "/home/sdc1/model/MDetection/autoencoder_model/Temp/baseline_v5_encdec_flatten_batch_16_code_64x64-1003250" 
+
+		eval_config["inputroot"] = '/home/sdc1/dataset/ICPR2012/training_data/scanner_A/bmp/'        
+		eval_config["labelroot"] = '/home/sdc1/dataset/ICPR2012/training_data/scanner_A/label_plot/'# for the input of the encoder         
+		eval_config["coderoot"] = '/home/sdc1/dataset/ICPR2012/training_data/scanner_A/label_code/' + str(eval_config["image_size"]) + 'x' + str(eval_config["image_size"])# for the output of the encoder & the input of the detection  
+        
+#		eval_config["inputroot"] = '/home/sdc1/dataset/ICPR2012/testing_data/scanner_A/bmp/'        
+#		eval_config["labelroot"] = '/home/sdc1/dataset/ICPR2012/testing_data/scanner_A/label_plot/'# for the input of the encoder         
+#		eval_config["coderoot"] = '/home/sdc1/dataset/ICPR2012/testing_data/scanner_A/label_code/' + str(eval_config["image_size"]) + 'x' + str(eval_config["image_size"])# for the output of the encoder & the input of the detection   
+
+		eval_config["predroot"] = '/home/sdc1/dataset/ICPR2012/testing_data/scanner_A/label_pred/' # for the input of the decoder from detection     
+     
+		eval_config["enc_output_dir"] = eval_config["coderoot"]                
 		eval_config["dec_output_dir"] = "./dec_output/" 
 
 	# Detection model config
 	def DE_baseline_model(self):
 
+		####################################
+		#             Training             #
+		####################################      
 		train_config = self.config["train"]
 
 		train_config["mode"] = "detection" 
-		train_config["iteration"] = 400000 
-		train_config["curr_iteration"] = 0
+		train_config["iteration"] = 800000 
+		train_config["curr_iteration"] = 111001
 		train_config["batch_size"] = 16 
 		train_config["image_size"] = 256           
 		train_config["project_image_size"] = 384
-		train_config["code_size"] = [64,64,4]           
+		train_config["code_size"] = [64,64,1]           
 		train_config["learning_rate"] = 1e-4 
 		train_config["checkpoint_dir"] = "/home/sdc1/model/MDetection/autoencoder_model" 
 		train_config["log_dir"] = "/home/sdc1/model/MDetection/autoencoder_model/log/" #Name of checkpoint directory [checkpoint]
 		train_config["output_dir"] = "output" # Name of sample directory [output]             
 #		train_config["ckpt_name"] = "DE_baseline"                 
 #		train_config["ckpt_name"] = "DE_baseline_flatten"            
-		train_config["ckpt_name"] = "DE_baseline_flatten_aug"         
+#		train_config["ckpt_name"] = "DE_baseline_flatten_aug"         
+#		train_config["ckpt_name"] = "DE_baseline_flatten_aug_alex_ent"                 
+#		train_config["ckpt_name"] = "DE_baseline_flatten_aug_alex_net_nab_13"           
+		train_config["ckpt_name"] = "DE_baseline_flatten_aug_alex_net_random_crop_nab_13" 
+#		train_config["ckpt_name"] = "DE_baseline_flatten_aug_alex_net_random_crop_nab_11"                  
+#		train_config["ckpt_name"] = "DE_baseline_flatten_aug_random_crop_nab_11"                 
 		train_config["is_train"] = True # True for training, False for testing [True]
-		train_config["model_ticket"] = "baseline" # Name of checkpoints
-		train_config["datasetroot"] = '/home/sdc1/dataset/ICPR2012/training_data/scanner_A/classfied_data/'        
+#		train_config["model_ticket"] = "baseline" # Name of checkpoints
+		train_config["model_ticket"] = "alex_net" # Name of checkpoints        
+		train_config["datasetroot"] = '/home/sdc1/dataset/ICPR2012/training_data/scanner_A/classfied_data/' + str(train_config["image_size"]) + 'x' + str(train_config["image_size"])        
 
+		####################################
+		#            Evaluation            #
+		####################################
 		eval_config = self.config["evaluation"]
-		eval_config["mode"] = 'encode'        
-		eval_config["labelroot"] = '/home/sdc1/dataset/ICPR2012/training_data/scanner_A/label_plot/'        
-		eval_config["coderoot"] = '/home/sdc1/dataset/ICPR2012/training_data/scanner_A/label_code/'                
+        
+		eval_config["mode"] = 'detection'         
+                  
 		eval_config["image_size"] = 256
-		eval_config["project_image_size"] = 2 * round( math.sqrt((eval_config["image_size"]/2)**2 + (eval_config["image_size"]/2)**2) ) + 1        
-		eval_config["code_size"] = [64,64,4]       
-		eval_config["model_ticket"] = "baseline_v4" 
-		eval_config["ckpt_file"] = "/home/wei/ML/model/MDetection/autoencoder_model/baseline/baseline_v4_max_5_decode_256_code_8_res_16_lrelu_L2_test_2_encdec-183150" 
-		eval_config["enc_output_dir"] = "./enc_output/" 
-		eval_config["dec_output_dir"] = "./dec_output/"     
+		eval_config["project_image_size"] = 384
+		eval_config["code_size"] = [64,64,1]       
+		eval_config["model_ticket"] = "alex_net" 
+		eval_config["ckpt_file"] = "/home/sdc1/model/MDetection/detection_model/Temp/DE_baseline_flatten_aug_alex_net_random_crop_nab_13-416000" 
+
+		eval_config["inputroot"] = '/home/sdc1/dataset/ICPR2012/testing_data/scanner_A/bmp/'        
+		eval_config["labelroot"] = '/home/sdc1/dataset/ICPR2012/testing_data/scanner_A/label_plot/'# for the input of the encoder        
+		eval_config["coderoot"] = '/home/sdc1/dataset/ICPR2012/testing_data/scanner_A/label_code/' + str(eval_config["image_size"]) + 'x' + str(eval_config["image_size"])# for the output of the encoder & the input of the detection        
+
+		eval_config["predroot"] = '/home/sdc1/dataset/ICPR2012/testing_data/scanner_A/label_pred/' # for the input of the decoder from detection       
+        
+		eval_config["detect_output_dir"] = "./detect_output/" 
+
     
     
     

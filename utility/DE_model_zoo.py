@@ -102,11 +102,13 @@ class model_zoo:
        
         model_params = {
 
-                        'conv1': [3,3,feature_size],
-                        'resblock': [3,3,feature_size],
-                        'conv2': [3,3,feature_size],
-                        'd_output': [3,3,4],
-                        'fc': 64*64*4,
+                        'conv1': [11,11,feature_size*2],
+                        'conv2': [5,5,feature_size*4],
+                        'resblock': [3,3,feature_size*4],
+                        'conv3': [3,3,feature_size*4],
+                        'fc4': 64*64*4,
+                        'fc5': 64*64*2,
+                        'fc_code': 64*64,
 
                         }
 
@@ -117,27 +119,81 @@ class model_zoo:
         
         with tf.name_scope("Detector"):  
             # 256x256x1
-            x = nf.convolution_layer(g_input, model_params["conv1"], [1,2,2,1], name="conv1", activat_fn=None, initializer=init)
-            conv_1 = x
+            x = nf.convolution_layer(g_input, model_params["conv1"], [1,2,2,1], name="conv1", activat_fn=tf.nn.relu, initializer=init)
+            conv_1 = tf.nn.max_pool(x, ksize=[1,3,3,1], strides=[1,2,2,1], padding='VALID')
+            print("conv_1: %s" % conv_1.get_shape())
+
+            x = nf.convolution_layer(conv_1, model_params["conv2"], [1,2,2,1], name="conv2", activat_fn=tf.nn.relu, initializer=init)
+            conv_2 = tf.nn.max_pool(x, ksize=[1,3,3,1], strides=[1,2,2,1], padding='VALID')
+            print("conv_2: %s" % conv_2.get_shape())
+            
+            x = conv_2
             # 128x128xfeature_size
             with tf.variable_scope("detector_resblock",reuse=False):            
                 #Add the residual blocks to the model
                 for i in range(num_resblock):
-                    x = nf.resBlock(x, feature_size, scale=1, reuse=False, idx = i, initializer=init)
-                x = nf.convolution_layer(x, model_params["conv2"], [1,1,1,1], name="conv2", activat_fn=None, initializer=init)
-                x += conv_1
-            x = nf.convolution_layer(x, model_params["conv1"], [1,2,2,1], name="conv3",  activat_fn=None, initializer=init)
-            # 64x64xfeature_size
-            g_network = nf.convolution_layer(x, model_params["d_output"], [1,1,1,1], name="conv4", flatten=True, activat_fn=tf.nn.relu, initializer=init)
-            # 64x64x4 (code size)
+                    x = nf.resBlock(x, feature_size*4, scale=1, reuse=False, idx = i, initializer=init)
+                x = nf.convolution_layer(x, model_params["conv3"], [1,1,1,1], name="conv3", activat_fn=tf.nn.relu, initializer=init)
+                x += conv_2
+                print("conv_3: %s" % x.get_shape())
+                
+            x = nf.convolution_layer(x, model_params["conv3"], [1,2,2,1], name="conv4",  activat_fn=tf.nn.relu, initializer=init, flatten=True)
+            print("conv_4: %s" % x.get_shape())
             
-            fc_output = nf.fc_layer(g_network, model_params["fc"], name="fc_layer", activat_fn=tf.nn.relu)
-                       
-        return fc_output         
+            fc_4 = nf.fc_layer(x, model_params["fc4"], name="fc_4", activat_fn=tf.nn.relu)
+            print("fc_4: %s" % fc_4.get_shape())
+            
+            fc_5 = nf.fc_layer(fc_4, model_params["fc5"], name="fc_5", activat_fn=tf.nn.relu)
+            print("fc_5: %s" % fc_5.get_shape())
+            
+            fc_code = nf.fc_layer(fc_5, model_params["fc_code"], name="fc_code", activat_fn=None)
+            print("fc_code: %s" % fc_code.get_shape())
+            
+        return fc_code         
 
+    def alex_net(self, kwargs = {}):
+
+        init = tf.random_normal_initializer(stddev=0.01)
+        
+        model_params = {
+
+                        'conv1': [11,11,96],
+                        'conv2': [5,5,256],
+                        'conv3': [3,3,384],
+                        'conv4': [3,3,384],
+                        'conv5': [3,3,256],          
+                        'fc6': 8192,                                  
+                        'fc7': 8192,                                                          
+                        'fc_code': 4096,            
+                        
+                        }        
+        with tf.name_scope("Detector"):  
+            
+            conv_1 = nf.convolution_layer(self.inputs, model_params["conv1"], [1,4,4,1], name="conv1", activat_fn=tf.nn.relu, initializer=init, padding='VALID')
+            conv_1 = tf.nn.max_pool(conv_1, ksize=[1,3,3,1], strides=[1,2,2,1], padding='VALID')
+            
+            conv_2 = nf.convolution_layer(conv_1, model_params["conv2"], [1,1,1,1], name="conv2", activat_fn=tf.nn.relu, initializer=init, padding='SAME')
+            conv_2 = tf.nn.max_pool(conv_2, ksize=[1,3,3,1], strides=[1,2,2,1], padding='VALID')
+
+            conv_3 = nf.convolution_layer(conv_2, model_params["conv3"], [1,1,1,1], name="conv3", activat_fn=tf.nn.relu, initializer=init, padding='SAME')
+
+            conv_4 = nf.convolution_layer(conv_3, model_params["conv4"], [1,1,1,1], name="conv4", activat_fn=tf.nn.relu, initializer=init, padding='SAME')
+
+            conv_5 = nf.convolution_layer(conv_4, model_params["conv5"], [1,1,1,1], name="conv5", activat_fn=tf.nn.relu, initializer=init, padding='SAME')
+            conv_5 = tf.nn.max_pool(conv_5, ksize=[1,3,3,1], strides=[1,2,2,1], padding='VALID')
+            conv_5 = tf.reshape(conv_5, [-1, int(np.prod(conv_5.get_shape()[1:]))], name="conv5_flatout")
+
+            fc6 = nf.fc_layer(conv_5, model_params["fc6"], name="fc6", activat_fn=tf.nn.relu)
+            
+            fc7 = nf.fc_layer(fc6, model_params["fc7"], name="fc7", activat_fn=tf.nn.relu)
+            
+            fc_code = nf.fc_layer(fc7, model_params["fc_code"], name="fc_code", activat_fn=None)
+            
+            return fc_code
+            
     def build_model(self, kwargs = {}):
 
-        model_list = ["googleLeNet_v1", "resNet_v1", "baseline"]
+        model_list = ["googleLeNet_v1", "resNet_v1", "baseline", "alex_net"]
         
         if self.model_ticket not in model_list:
             print("sorry, wrong ticket!")

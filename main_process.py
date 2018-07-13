@@ -54,6 +54,7 @@ def main(_):
                                         batch_size=conf["batch_size"],
                                         image_size=conf["image_size"], 
                                         project_image_size=conf["project_image_size"], 
+                                        code_size=conf["code_size"],
                                         learning_rate=conf["learning_rate"],
                                         checkpoint_dir=conf["checkpoint_dir"],
                                         ckpt_name=conf["ckpt_name"],

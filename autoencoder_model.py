@@ -883,7 +883,7 @@ class AUTOENCODER_MODEL(object):
            
         print("Current learning rate: [{}]".format(self.learning_rate))
         
-        save_it = 250
+        save_it = 1000
         
         util = utils.utility(self.image_size, self.image_size, self.project_image_size)
         
