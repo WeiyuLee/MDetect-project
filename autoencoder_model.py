@@ -884,6 +884,7 @@ class AUTOENCODER_MODEL(object):
         print("Current learning rate: [{}]".format(self.learning_rate))
         
         save_it = 1000
+        minimum_loss = 1000
         
         util = utils.utility(self.image_size, self.image_size, self.project_image_size)
         
@@ -920,7 +921,16 @@ class AUTOENCODER_MODEL(object):
                     self.save_output(batch_images[0], decode_output[0], self.ckpt_name, it)
                     #scipy.misc.imsave('./output/encode_input_{}.jpg'.format(it), batch_images[0].squeeze())
                     #scipy.misc.imsave('./output/decode_output_{}.jpg'.format(it), decode_output[0].squeeze())                
+
+                if minimum_loss > train_loss:
+                    minimum_loss = train_loss
+                    self.save_best_ckpt(self.checkpoint_dir, self.ckpt_name, minimum_loss, it)
                                                                      
                 print("Iter: [{}], Train: [{}]".format((it+1), train_loss))       
                 
                 summary_writer.add_summary(train_sum, it)        
+                
+                
+                
+                
+                
