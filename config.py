@@ -15,6 +15,8 @@ code_std_224 = 8.928753852844238
 mean_std = { 256: [image_mean_256, image_std_256, code_mean_256, code_std_256],
              224: [image_mean_256, image_std_256, code_mean_256, code_std_256] }
 
+#file_root = '/data/wei/'
+file_root = '/home/sdc1/'
 
 class config:
 
@@ -112,8 +114,8 @@ class config:
 #		train_config["project_image_size"] = 2 * round( math.sqrt((train_config["image_size"]/2)**2 + (train_config["image_size"]/2)**2) ) + 1
 		train_config["project_image_size"] = 384        
 		train_config["learning_rate"] = 1e-4/2 
-		train_config["checkpoint_dir"] = "/home/sdc1/model/MDetection/autoencoder_model" 
-		train_config["log_dir"] = "/home/sdc1/model/MDetection/autoencoder_model/log/" #Name of checkpoint directory [checkpoint]
+		train_config["checkpoint_dir"] = file_root + "model/MDetection/autoencoder_model" 
+		train_config["log_dir"] = file_root + "model/MDetection/autoencoder_model/log/" #Name of checkpoint directory [checkpoint]
 		train_config["output_dir"] = "output" # Name of sample directory [output]
 #		train_config["ckpt_name"] = "test_v2"
 #		train_config["ckpt_name"] = "test_v2_max_32"        
@@ -171,17 +173,17 @@ class config:
 		eval_config["project_image_size"] = 384
 		eval_config["code_size"] = [64,64,1]       
 		eval_config["model_ticket"] = "baseline_v5_flatten" 
-		eval_config["ckpt_file"] = "/data/wei/model/MDetection/autoencoder_model/Temp/baseline_v5_encdec_flatten_batch_16_code_64x64-1003250" 
+		eval_config["ckpt_file"] = file_root + "model/MDetection/autoencoder_model/Temp/baseline_v5_encdec_flatten_batch_16_code_64x64-1003250" 
 
 #		eval_config["inputroot"] = '/data/wei/dataset/MDetection/ICPR2012/training_data/scanner_A/bmp/'        
 #		eval_config["labelroot"] = '/data/wei/dataset/MDetection/ICPR2012/training_data/scanner_A/label_plot/'# for the input of the encoder         
 #		eval_config["coderoot"] = '/data/wei/dataset/MDetection/ICPR2012/training_data/scanner_A/label_code/' + str(eval_config["image_size"]) + 'x' + str(eval_config["image_size"]) + '/'# for the output of the encoder & the input of the detection  
         
-		eval_config["inputroot"] = '/data/wei/dataset/MDetection/ICPR2012/testing_data/scanner_A/bmp/'        
-		eval_config["labelroot"] = '/data/wei/dataset/MDetection/ICPR2012/testing_data/scanner_A/label_plot/'# for the input of the encoder         
-		eval_config["coderoot"] = '/data/wei/dataset/MDetection/ICPR2012/testing_data/scanner_A/label_code/' + str(eval_config["image_size"]) + 'x' + str(eval_config["image_size"])# for the output of the encoder & the input of the detection   
+		eval_config["inputroot"] = file_root + 'dataset/MDetection/ICPR2012/testing_data/scanner_A/bmp/'        
+		eval_config["labelroot"] = file_root + 'dataset/MDetection/ICPR2012/testing_data/scanner_A/label_plot/'# for the input of the encoder         
+		eval_config["coderoot"] =  file_root + 'dataset/MDetection/ICPR2012/testing_data/scanner_A/label_code/' + str(eval_config["image_size"]) + 'x' + str(eval_config["image_size"])# for the output of the encoder & the input of the detection   
 
-		eval_config["predroot"] = '/data/wei/dataset/MDetection/ICPR2012/testing_data/scanner_A/label_pred/' # for the input of the decoder from detection     
+		eval_config["predroot"] = file_root + 'dataset/MDetection/ICPR2012/testing_data/scanner_A/label_pred/' # for the input of the decoder from detection     
      
 		eval_config["enc_output_dir"] = eval_config["coderoot"]                
 		eval_config["dec_output_dir"] = "./dec_output/" 
@@ -202,8 +204,8 @@ class config:
 		train_config["project_image_size"] = 384
 		train_config["code_size"] = [64,64,1]           
 		train_config["learning_rate"] = 1e-4/2
-		train_config["checkpoint_dir"] = "/data/wei/model/MDetection/detection_model" 
-		train_config["log_dir"] = "/data/wei/model/MDetection/detection_model/log/" #Name of checkpoint directory [checkpoint]
+		train_config["checkpoint_dir"] = file_root + "model/MDetection/detection_model" 
+		train_config["log_dir"] = file_root + "model/MDetection/detection_model/log/" #Name of checkpoint directory [checkpoint]
 		train_config["output_dir"] = "output" # Name of sample directory [output]             
 #		train_config["ckpt_name"] = "DE_alexnet_nab_13_normalized"                 
 		train_config["ckpt_name"] = "DE_baseline_nab_13_normalized"            
@@ -211,7 +213,7 @@ class config:
 		train_config["model_ticket"] = "baseline" # Name of checkpoints
 #		train_config["model_ticket"] = "alex_net" # Name of checkpoints                
         
-		train_config["datasetroot"] = '/data/wei/dataset/MDetection/ICPR2012/training_data/scanner_A/classfied_data/' + str(train_config["image_size"]) + 'x' + str(train_config["image_size"]) + '/'        
+		train_config["datasetroot"] = file_root + 'dataset/MDetection/ICPR2012/training_data/scanner_A/classfied_data/' + str(train_config["image_size"]) + 'x' + str(train_config["image_size"]) + '/'        
 
 		####################################
 		#            Evaluation            #
@@ -224,13 +226,13 @@ class config:
 		eval_config["project_image_size"] = 384
 		eval_config["code_size"] = [64,64,1]       
 		eval_config["model_ticket"] = "alex_net" 
-		eval_config["ckpt_file"] = "/data/wei/model/MDetection/detection_model/Temp/DE_alexnet_nab_13_normalized/DE_alexnet_nab_13_normalized-244000" 
+		eval_config["ckpt_file"] = file_root + "model/MDetection/detection_model/Temp/DE_alexnet_nab_13_normalized/DE_alexnet_nab_13_normalized-244000" 
 
-		eval_config["inputroot"] = '/data/wei/dataset/MDetection/ICPR2012/testing_data/scanner_A/bmp/'        
-		eval_config["labelroot"] = '/data/wei/dataset/MDetection/ICPR2012/testing_data/scanner_A/label_plot/'# for the input of the encoder        
-		eval_config["coderoot"] = '/data/wei/dataset/MDetection/ICPR2012/testing_data/scanner_A/label_code/' + str(eval_config["image_size"]) + 'x' + str(eval_config["image_size"]) + '/'# for the output of the encoder & the input of the detection        
+		eval_config["inputroot"] = file_root + 'dataset/MDetection/ICPR2012/testing_data/scanner_A/bmp/'        
+		eval_config["labelroot"] = file_root + 'dataset/MDetection/ICPR2012/testing_data/scanner_A/label_plot/'# for the input of the encoder        
+		eval_config["coderoot"] =  file_root + 'dataset/MDetection/ICPR2012/testing_data/scanner_A/label_code/' + str(eval_config["image_size"]) + 'x' + str(eval_config["image_size"]) + '/'# for the output of the encoder & the input of the detection        
 
-		eval_config["predroot"] = '/data/wei/dataset/MDetection/ICPR2012/testing_data/scanner_A/label_pred/' # for the input of the decoder from detection       
+		eval_config["predroot"] =  file_root + 'dataset/MDetection/ICPR2012/testing_data/scanner_A/label_pred/' # for the input of the decoder from detection       
         
 		eval_config["detect_output_dir"] = "./detect_output/" 
 
