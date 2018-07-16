@@ -9,6 +9,7 @@ import math
 import numpy as np
 import random
 import tensorflow as tf
+import datetime
 
 #import matplotlib.pyplot as plt
 #import matplotlib.image as mpimg
@@ -127,43 +128,51 @@ class utility:
                     curr_project_image[line_idx, r+(self.num_lines//2)] = d 
                     
             output_batch_project.append(curr_project_image)    
+            
+        output_batch_project = np.array(output_batch_project)               
         
         #print("output_batch_project shape: {}".format(np.array(output_batch_project).shape))
         
-        return np.array(output_batch_project)                
+        return output_batch_project
             
     
-    def projection_reverse(self, batch_project_image, batch_size):
+    def projection_reverse(self, batch_project_image, batch_size, debug_msg=0):
         
         num_lines = batch_project_image[0].shape[0]
         
         output_batch_image = []
         
+        #print("num_lines = [{}]".format(num_lines))
+        #print("batch_size = [{}]".format(batch_size))
+        
         for b_idx in range(batch_size):
             curr_project_image = batch_project_image[b_idx]
             curr_image = np.zeros([self.image_height, self.image_width, 1])
-            
+
             for line_idx in range(num_lines):
                 curr_row = curr_project_image[line_idx, :]
                 
                 # record the nonzero idx
-                cells = np.nonzero(curr_row)
+                #cells = np.nonzero(curr_row)                       
+                cells = np.where(np.abs(curr_row) > 0.9)                       
                 
                 for cell_idx in cells[0]:
                     #r = cell_idx - self.R
                     r = cell_idx - (self.num_lines//2)
-                    d = curr_row[cell_idx, 0]        
+                    d = curr_row[cell_idx, 0]                        
                     
                     #Z = (self.A[line_idx]**2 + self.B[line_idx]**2)
-                    re_h = round( self.X[line_idx] + self.A[line_idx]*r/self.Z + self.B[line_idx]*d/self.Z )
-                    re_w = round( self.Y[line_idx] + self.B[line_idx]*r/self.Z - self.A[line_idx]*d/self.Z )
-
+                    re_h = round( self.X[line_idx] + ((self.A[line_idx]*r + self.B[line_idx]*d) / self.Z) )
+                    re_w = round( self.Y[line_idx] + ((self.B[line_idx]*r - self.A[line_idx]*d) / self.Z) )            
+                    
                     if (re_h >= 0 and re_h < self.image_height) and (re_w >= 0 and re_w < self.image_width):
                         curr_image[re_h, re_w] = 255
-            
+                
             output_batch_image.append(curr_image)
-            
-        return np.array(output_batch_image)
+        
+        output_batch_image = np.array(output_batch_image)
+        
+        return output_batch_image
 
 def log10(x):
   numerator = tf.log(x)

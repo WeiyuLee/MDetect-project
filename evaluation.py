@@ -109,7 +109,7 @@ class encode_decode_detect:
             list_data.append(curr_list)
             meta_data.append(curr_meata)
         
-        # code_data.shape = (?, 64, 64, 4)
+        # code_data.shape = (?, 64, 64, 1) => (?, 4096)
         return image_data, code_data, list_data, meta_data
 
     #Load Tensorflow Model from check points
@@ -369,7 +369,7 @@ class encode_decode_detect:
 
         for i_idx in range(len(code_data)):
             
-            print("File: {}".format(self.code_data_list[i_idx]))
+            print("========== File: {} ========== ".format(self.code_data_list[i_idx]))
             
             # Decode
             starttime = datetime.datetime.now()
@@ -379,7 +379,7 @@ class encode_decode_detect:
             
             # Reverse to coordinates
             starttime = datetime.datetime.now()
-            project_rev = util.projection_reverse(pred, len(pred))   
+            project_rev = util.projection_reverse(pred, len(pred), debug_msg=24)   
             endtime = datetime.datetime.now()
             print("Reverse time: {}".format((endtime - starttime).seconds))
             
@@ -400,7 +400,14 @@ class encode_decode_detect:
 
         #run detection for images in input folder and save as image
         image_data, code_data, list_data, meta_data = self.load_pickle_data(self.code_path)
+        image_data = np.array(image_data)
+        code_data = np.array(code_data)
+        
         self.load_detection_model()
+        
+        # Normalization 
+        image_data = (image_data - config.mean_std[self.image_size][0]) / config.mean_std[self.image_size][1]
+        code_data =  (code_data - config.mean_std[self.image_size][2]) / config.mean_std[self.image_size][3]
         
         progress = 1
 
@@ -410,6 +417,9 @@ class encode_decode_detect:
             
             # Detection
             pred = self.prediction(image_data[i_idx])
+
+            # Reverse
+            pred = (pred * config.mean_std[self.image_size][3]) + config.mean_std[self.image_size][2]
 
             # Save code per image as pickle
             if not os.path.exists(self.pred_path):
@@ -427,11 +437,14 @@ class encode_decode_detect:
 
     def save_output(self, decode_images, file_name, flag=[]):
         
-        if not os.path.exists(self.dec_output_dir):
-            os.makedirs(self.dec_output_dir)                
+        file_name = os.path.splitext(file_name)[0]
+        output_dir = os.path.join(self.dec_output_dir, file_name)
+
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)                
 
         for p_idx in range(len(decode_images)):            
-            scipy.misc.imsave(self.dec_output_dir + os.path.splitext(file_name)[0] + flag + '_patch_{}.png'.format(p_idx), decode_images[p_idx].squeeze())  
+            scipy.misc.imsave(os.path.join(output_dir, file_name + flag + '_patch_{}.png'.format(p_idx)), decode_images[p_idx].squeeze())  
             
 def  main_process():
 
