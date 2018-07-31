@@ -4,18 +4,11 @@ Created on Mon Jun 25 14:19:44 2018
 
 @author: Weiyu_Lee
 """
-
+import argparse
 import os
 import pickle
 import numpy as np
-
-#    256x256
-#    Image [mean, std]: [157.15577773758343, 57.6469560215388]
-#    Code  [mean, std]: [9.645856857299805, 9.694955825805664]   
-    
-#    224x224
-#    Image [mean, std]: [157.0940914357948, 57.67350522847466]
-#    Code  [mean, std]: [9.611194610595703, 8.928753852844238]
+import config
        
 def load_pickle_data(datasetroot, data_list):
 
@@ -27,17 +20,21 @@ def load_pickle_data(datasetroot, data_list):
 #    data_list = os.listdir(datasetroot)
     
     for f in data_list:
-        f = open(os.path.join(datasetroot, f), "rb")
-        curr_image = pickle.load(f)
-        curr_code = pickle.load(f)
-        curr_list = pickle.load(f)
-        curr_meta = pickle.load(f)
-        f.close()
         
-        image_data.append(curr_image)
-        code_data.append(curr_code)
-        check_list_data.append(curr_list)
-        meta_data.append(curr_meta)
+        if f == "mean_image.pkl":
+            continue
+        else:
+            f = open(os.path.join(datasetroot, f), "rb")
+            curr_image = pickle.load(f)
+            curr_code = pickle.load(f)
+            curr_list = pickle.load(f)
+            curr_meta = pickle.load(f)
+            f.close()
+            
+            image_data.append(curr_image)
+            code_data.append(curr_code)
+            check_list_data.append(curr_list)
+            meta_data.append(curr_meta)
     
     # code_data.shape = (?, 64, 64, 4)
     return image_data, code_data, check_list_data, meta_data   
@@ -56,7 +53,7 @@ def classify_data(image_data, code_data, check_list_data, meta_data, data_list):
     
 #    data_list = os.listdir(datasetroot)
     
-    for i_idx in range(len(data_list)):
+    for i_idx in range(len(data_list)-1):
                
         curr_list = check_list_data[i_idx]
         
@@ -86,52 +83,23 @@ def classify_data(image_data, code_data, check_list_data, meta_data, data_list):
     print("Total abnormal patch count: {}".format(total_ab_count))
                                 
     return normal_image_data, normal_code_data, normal_meta_data, abnormal_image_data, abnormal_code_data, abnormal_meta_data
-
-def normalize_data(image_data, code_data, mean_std):
-   
-    image_data = np.array(image_data)
-    code_data = np.array(code_data)
-    
-#    image_mean = np.mean(image_data)
-#    image_std = np.std(image_data)
-#    
-#    code_mean = np.mean(code_data)
-#    code_std = np.std(code_data)
-
-    image_mean = mean_std[0]
-    image_std = mean_std[1]
-    code_mean = mean_std[2]
-    code_std = mean_std[3]
-   
-    image_data = image_data - image_mean
-    image_data = image_data / image_std
-    code_data = (code_data - code_mean) / code_std
-
-    print("Image [mean, std]: [{}, {}]".format(image_mean, image_std))
-    print("Code  [mean, std]: [{}, {}]".format(code_mean, code_std))
-       
-    return image_data, code_data
         
 def main_process():
     
-    pickle_import_dir = "/data/wei/dataset/MDetection/ICPR2012/training_data/scanner_A/label_code/224x224"    
-    output_dir = "/data/wei/dataset/MDetection/ICPR2012/training_data/scanner_A/classfied_data/"
+    #Parsing argumet(configuration name) from shell, 
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-c", "--config", default="example",help="Configuration name")
+    args = parser.parse_args()
+    conf = config.config(args.config).config
+
+    prpc_conf = conf["preprocess"]
+    pickle_import_dir = prpc_conf["coderoot"]
+    output_dir = prpc_conf["output_dir"]
+    
+#    pickle_import_dir = "/data/wei/dataset/MDetection/ICPR2012/training_data/scanner_A/label_code/224x224"    
+#    output_dir = "/data/wei/dataset/MDetection/ICPR2012/training_data/scanner_A/classfied_data/"
 #    pickle_import_dir = "/home/sdc1/dataset/ICPR2012/testing_data/scanner_A/label_code/"    
 #    output_dir = "/home/sdc1/dataset/ICPR2012/testing_data/scanner_A/classfied_data/"
-
-#    256x256 
-#    image_mean = 157.15577773758343
-#    image_std = 57.6469560215388
-#    code_mean = 9.645856857299805
-#    code_std = 9.694955825805664
-
-#    224x224 
-    image_mean = 157.0940914357948
-    image_std = 57.67350522847466
-    code_mean = 9.611194610595703
-    code_std = 8.928753852844238
-
-    mean_std = [image_mean, image_std, code_mean, code_std]
 
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)    
@@ -139,7 +107,7 @@ def main_process():
     print("Loading data...")
     print(pickle_import_dir)    
     data_list = os.listdir(pickle_import_dir)
-    data_num = len(data_list)
+    data_num = len(data_list) - 1
     data_step = data_num//5
     
     batch_count = 0
@@ -150,9 +118,6 @@ def main_process():
         curr_data_list = data_list[d_idx:d_idx+data_step]
         
         image_data, code_data, check_list_data, meta_data = load_pickle_data(pickle_import_dir, curr_data_list)
-    
-#        print("Normalizing data...{}".format(batch_count))
-#        image_data, code_data = normalize_data(image_data, code_data, mean_std)
         
         print("Classifying data...{}".format(batch_count))
         n_image, n_code, n_meta, ab_image, ab_code, ab_meta = classify_data(image_data, code_data, check_list_data, meta_data, curr_data_list) 

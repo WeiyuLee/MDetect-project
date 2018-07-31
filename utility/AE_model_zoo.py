@@ -701,9 +701,447 @@ class model_zoo:
                 
             return deconv_1                 
 
+    def baseline_v6_flatten(self, kwargs):
+         
+        model_params = {
+        
+            "conv_1": [11,11,64],
+            "conv_2": [5,5,128],
+            "conv_3": [3,3,128],
+            "conv_4": [3,3,64],
+            
+            "fc_code": 4096,
+            "fc_6": 8*91*64,
+            
+            "deconv_4": [3,3,64],
+            "deconv_3": [3,3,128],
+            "deconv_2": [5,5,128],
+            "deconv_1": [11,11,64]
+        }
+
+        mode = kwargs["mode"]
+        
+        image_size = kwargs["image_size"]
+                
+        num_resblock = 16
+        
+        init = tf.random_normal_initializer(stddev=0.01)
+
+        if mode is "encoder":                
+            with tf.name_scope("encoder"):
+                conv_1 = nf.convolution_layer(self.inputs, model_params["conv_1"], [1,2,2,1], name="conv_1", padding='SAME')
+                # 128x128x64
+                print("conv_1: %s" % conv_1.get_shape())                
+                
+                conv_2 = nf.convolution_layer(conv_1, model_params["conv_2"], [1,1,1,1], name="conv_2", padding='SAME')
+                # 64x64x32
+                print("conv_2: %s" % conv_2.get_shape())
+                
+                conv_3 = nf.convolution_layer(conv_2, model_params["conv_3"], [1,1,1,1], name="conv_3", padding='SAME')
+                # 64x64x16
+                print("conv_3: %s" % conv_3.get_shape())
+                
+                conv_3_1 = nf.convolution_layer(conv_3, model_params["conv_3"], [1,1,1,1], name="conv_3_1", padding='SAME')
+                conv_3_2 = nf.convolution_layer(conv_3 + conv_3_1, model_params["conv_3"], [1,1,1,1], name="conv_3_2", padding='SAME')
+                conv_3_3 = nf.convolution_layer(conv_3 + conv_3_1 + conv_3_2, model_params["conv_3"], [1,1,1,1], name="conv_3_3", padding='SAME')
+                
+                conv_4 = nf.convolution_layer(conv_3 + conv_3_1 + conv_3_2 + conv_3_3, model_params["conv_4"], [1,2,2,1], name="conv_4", padding='SAME')
+                # 64x64x4
+                print("conv_4: %s" % conv_4.get_shape())
+                
+                with tf.variable_scope("encoder_resblock",reuse=False): 
+                    en_rb_x = conv_4
+                    #Add the residual blocks to the model
+                    for i in range(num_resblock):
+                        en_rb_x = nf.resBlock(en_rb_x, model_params["conv_4"][2], scale=1, reuse=False, idx = i, initializer=init)
+                    en_rb_x = nf.convolution_layer(en_rb_x, model_params["conv_4"], [1,1,1,1], name="conv_5", activat_fn=None, initializer=init)
+                    en_rb_x += conv_4
+                    en_rb_x = tf.nn.relu(en_rb_x)
+                
+                    en_rb_x = tf.reshape(en_rb_x, [tf.shape(self.inputs)[0], 8*91*64])
+                
+                fc_5 = nf.fc_layer(en_rb_x, model_params["fc_code"], name="fc_5", activat_fn=tf.nn.relu)
+                print("fc_5: %s" % fc_5.get_shape())
+                
+                code_layer = fc_5
+                print("Encoder: code layer's shape is %s" % code_layer.get_shape())
+                
+            return code_layer
+
+        if mode is "decoder": 
+            
+            code_layer = kwargs["code"]
+            print("Decoder: code layer's shape is %s" % code_layer.get_shape())
+            
+            fc_7 = nf.fc_layer(code_layer, model_params["fc_6"], name="fc_7", activat_fn=tf.nn.relu)
+            print("fc_7: %s" % fc_7.get_shape())
+            
+            fc_7 = tf.reshape(fc_7, [tf.shape(self.inputs)[0], image_size[0]//4+1, image_size[1]//4+1, 64])
+            
+            with tf.name_scope("decoder"):           
+    
+                with tf.variable_scope("decoder_resblock",reuse=False): 
+                    de_rb_x = fc_7
+                    #Add the residual blocks to the model
+                    for i in range(num_resblock):
+                        de_rb_x = nf.resBlock(de_rb_x, model_params["conv_4"][2], scale=1, reuse=False, idx = i, initializer=init)
+                    de_rb_x = nf.convolution_layer(de_rb_x, model_params["conv_4"], [1,1,1,1], name="deconv_5", activat_fn=None, initializer=init)
+                    de_rb_x += fc_7            
+                    de_rb_x = tf.nn.relu(de_rb_x)
+    
+                deconv_4   = nf.lrelu(self.deconv2d("deconv_4", de_rb_x,                              ksize=3, stride=2, outshape=[tf.shape(self.inputs)[0], image_size[0]//2, image_size[1]//2+1, 128]))            
+                # 91x91x8
+                print("deconv_4: %s" % deconv_4.get_shape())
+                
+                deconv_3_3 = nf.lrelu(self.deconv2d("deconv_3_3", deconv_4,                           ksize=3, stride=1, outshape=[tf.shape(self.inputs)[0], image_size[0]//2, image_size[1]//2+1, 128]))           
+                deconv_3_2 = nf.lrelu(self.deconv2d("deconv_3_2", deconv_3_3 + deconv_4,              ksize=3, stride=1, outshape=[tf.shape(self.inputs)[0], image_size[0]//2, image_size[1]//2+1, 128]))            
+                deconv_3_1 = nf.lrelu(self.deconv2d("deconv_3_1", deconv_3_2 + deconv_3_3 + deconv_4, ksize=3, stride=1, outshape=[tf.shape(self.inputs)[0], image_size[0]//2, image_size[1]//2+1, 128]))            
+                
+                deconv_3   = nf.lrelu(self.deconv2d("deconv_3", deconv_3_1 + deconv_3_2 + deconv_3_3 + deconv_4, ksize=3, stride=1, outshape=[tf.shape(self.inputs)[0], image_size[0]//2, image_size[1]//2+1, 128]))            
+                # 91x91x16  
+                print("deconv_3: %s" % deconv_3.get_shape())
+                
+                deconv_2   = nf.lrelu(self.deconv2d("deconv_2", deconv_3, ksize=5, stride=1, outshape=[tf.shape(self.inputs)[0], image_size[0]//2, image_size[1]//2+1, 64]))            
+                # 182x182x32  
+                print("deconv_2: %s" % deconv_2.get_shape())
+                
+                deconv_1   = nf.lrelu(self.deconv2d("deconv_1", deconv_2, ksize=11, stride=2, outshape=[tf.shape(self.inputs)[0], image_size[0], image_size[1], 1]))
+                print("deconv_1: %s" % deconv_1.get_shape())
+                
+            return deconv_1  
+
+    def baseline_end2end(self, kwargs):
+         
+        model_params = {
+        
+            "conv_1": [11,11,64],
+            "conv_2": [5,5,128],
+            "conv_3": [3,3,128],
+            "conv_4": [3,3,64],
+            
+            "fc_code": 4096,
+            "fc_6": 16*16*64,
+            
+            "deconv_4": [3,3,64],
+            "deconv_3": [3,3,128],
+            "deconv_2": [5,5,128],
+            "deconv_1": [11,11,64]
+        }
+
+        mode = kwargs["mode"]
+        
+        image_size = kwargs["image_size"]
+                
+        num_resblock = 16
+        
+        init = tf.random_normal_initializer(stddev=0.01)
+
+        if mode is "encoder":                
+            with tf.name_scope("encoder"):
+                print("input: %s" % self.inputs.get_shape())
+                
+                conv_1 = nf.convolution_layer(self.inputs, model_params["conv_1"], [1,2,2,1], name="conv_1", padding='SAME')
+                # 128x128x64
+                print("conv_1: %s" % conv_1.get_shape())                
+                
+                conv_2 = nf.convolution_layer(conv_1, model_params["conv_2"], [1,2,2,1], name="conv_2", padding='SAME')
+                # 64x64x128
+                print("conv_2: %s" % conv_2.get_shape())
+                
+                conv_3 = nf.convolution_layer(conv_2, model_params["conv_3"], [1,2,2,1], name="conv_3", padding='SAME')
+                # 32x32x128
+                print("conv_3: %s" % conv_3.get_shape())
+                
+                conv_3_1 = nf.convolution_layer(conv_3, model_params["conv_3"], [1,1,1,1], name="conv_3_1", padding='SAME')
+                conv_3_2 = nf.convolution_layer(conv_3 + conv_3_1, model_params["conv_3"], [1,1,1,1], name="conv_3_2", padding='SAME')
+                conv_3_3 = nf.convolution_layer(conv_3 + conv_3_1 + conv_3_2, model_params["conv_3"], [1,1,1,1], name="conv_3_3", padding='SAME')
+                
+                conv_4 = nf.convolution_layer(conv_3 + conv_3_1 + conv_3_2 + conv_3_3, model_params["conv_4"], [1,2,2,1], name="conv_4", padding='SAME')
+                # 16x16x64
+                print("conv_4: %s" % conv_4.get_shape())
+                
+                with tf.variable_scope("encoder_resblock",reuse=False): 
+                    en_rb_x = conv_4
+                    #Add the residual blocks to the model
+                    for i in range(num_resblock):
+                        en_rb_x = nf.resBlock(en_rb_x, model_params["conv_4"][2], scale=1, reuse=False, idx = i, initializer=init)
+                    en_rb_x = nf.convolution_layer(en_rb_x, model_params["conv_4"], [1,1,1,1], name="conv_5", activat_fn=None, initializer=init)
+                    en_rb_x += conv_4
+                    en_rb_x = tf.nn.relu(en_rb_x)
+                
+                    en_rb_x = tf.reshape(en_rb_x, [tf.shape(self.inputs)[0], 16*16*64])
+                
+                fc_5 = nf.fc_layer(en_rb_x, model_params["fc_code"], name="fc_5", activat_fn=tf.nn.relu)
+                print("fc_5: %s" % fc_5.get_shape())
+                
+                code_layer = fc_5
+                print("Encoder: code layer's shape is %s" % code_layer.get_shape())
+                
+            return code_layer
+
+        if mode is "decoder": 
+            
+            code_layer = kwargs["code"]
+            print("Decoder: code layer's shape is %s" % code_layer.get_shape())
+            
+            fc_7 = nf.fc_layer(code_layer, model_params["fc_6"], name="fc_7", activat_fn=tf.nn.relu)           
+            fc_7 = tf.reshape(fc_7, [tf.shape(self.inputs)[0], image_size[0]//16, image_size[1]//16, 64])
+            print("fc_7: %s" % fc_7.get_shape())
+            
+            with tf.name_scope("decoder"):           
+    
+                with tf.variable_scope("decoder_resblock",reuse=False): 
+                    de_rb_x = fc_7
+                    #Add the residual blocks to the model
+                    for i in range(num_resblock):
+                        de_rb_x = nf.resBlock(de_rb_x, model_params["conv_4"][2], scale=1, reuse=False, idx = i, initializer=init)
+                    de_rb_x = nf.convolution_layer(de_rb_x, model_params["conv_4"], [1,1,1,1], name="deconv_5", activat_fn=None, initializer=init)
+                    de_rb_x += fc_7            
+                    de_rb_x = tf.nn.relu(de_rb_x)
+    
+                deconv_4   = nf.lrelu(self.deconv2d("deconv_4", de_rb_x,                              ksize=3, stride=2, outshape=[tf.shape(self.inputs)[0], image_size[0]//8, image_size[1]//8, 128]))            
+                # 91x91x8
+                print("deconv_4: %s" % deconv_4.get_shape())
+                
+                deconv_3_3 = nf.lrelu(self.deconv2d("deconv_3_3", deconv_4,                           ksize=3, stride=1, outshape=[tf.shape(self.inputs)[0], image_size[0]//8, image_size[1]//8, 128]))           
+                deconv_3_2 = nf.lrelu(self.deconv2d("deconv_3_2", deconv_3_3 + deconv_4,              ksize=3, stride=1, outshape=[tf.shape(self.inputs)[0], image_size[0]//8, image_size[1]//8, 128]))            
+                deconv_3_1 = nf.lrelu(self.deconv2d("deconv_3_1", deconv_3_2 + deconv_3_3 + deconv_4, ksize=3, stride=1, outshape=[tf.shape(self.inputs)[0], image_size[0]//8, image_size[1]//8, 128]))            
+                
+                deconv_3   = nf.lrelu(self.deconv2d("deconv_3", deconv_3_1 + deconv_3_2 + deconv_3_3 + deconv_4, ksize=3, stride=2, outshape=[tf.shape(self.inputs)[0], image_size[0]//4, image_size[1]//4, 128]))            
+                # 91x91x16  
+                print("deconv_3: %s" % deconv_3.get_shape())
+                
+                deconv_2   = nf.lrelu(self.deconv2d("deconv_2", deconv_3, ksize=5, stride=2, outshape=[tf.shape(self.inputs)[0], image_size[0]//2, image_size[1]//2, 64]))            
+                # 182x182x32  
+                print("deconv_2: %s" % deconv_2.get_shape())
+                
+                deconv_1   = nf.lrelu(self.deconv2d("deconv_1", deconv_2, ksize=11, stride=2, outshape=[tf.shape(self.inputs)[0], image_size[0], image_size[1], 1]))
+                print("output: %s" % deconv_1.get_shape())
+                
+            return deconv_1  
+
+    def baseline_end2end_2D(self, kwargs):
+         
+        model_params = {
+        
+            "conv_1": [11,11,64],
+            "conv_2": [5,5,128],
+            "conv_3": [3,3,128],
+            "conv_4": [3,3,64],
+
+            "conv_code": [3,3,16],            
+            
+            "deconv_4": [3,3,64],
+            "deconv_3": [3,3,128],
+            "deconv_2": [5,5,128],
+            "deconv_1": [11,11,64]
+        }
+
+        mode = kwargs["mode"]
+        
+        image_size = kwargs["image_size"]
+                
+        num_resblock = 16
+        
+        init = tf.random_normal_initializer(stddev=0.01)
+
+        if mode is "encoder":                
+            with tf.name_scope("encoder"):
+                print("input: %s" % self.inputs.get_shape())
+                
+                conv_1 = nf.convolution_layer(self.inputs, model_params["conv_1"], [1,2,2,1], name="conv_1", padding='SAME')
+                # 128x128x64
+                print("conv_1: %s" % conv_1.get_shape())                
+                
+                conv_2 = nf.convolution_layer(conv_1, model_params["conv_2"], [1,2,2,1], name="conv_2", padding='SAME')
+                # 64x64x128
+                print("conv_2: %s" % conv_2.get_shape())
+                
+                conv_3 = nf.convolution_layer(conv_2, model_params["conv_3"], [1,2,2,1], name="conv_3", padding='SAME')
+                # 32x32x128
+                print("conv_3: %s" % conv_3.get_shape())
+                
+                conv_3_1 = nf.convolution_layer(conv_3, model_params["conv_3"], [1,1,1,1], name="conv_3_1", padding='SAME')
+                conv_3_2 = nf.convolution_layer(conv_3 + conv_3_1, model_params["conv_3"], [1,1,1,1], name="conv_3_2", padding='SAME')
+                conv_3_3 = nf.convolution_layer(conv_3 + conv_3_1 + conv_3_2, model_params["conv_3"], [1,1,1,1], name="conv_3_3", padding='SAME')
+                
+                conv_4 = nf.convolution_layer(conv_3 + conv_3_1 + conv_3_2 + conv_3_3, model_params["conv_4"], [1,2,2,1], name="conv_4", padding='SAME')
+                # 16x16x64
+                print("conv_4: %s" % conv_4.get_shape())
+                
+                with tf.variable_scope("encoder_resblock",reuse=False): 
+                    en_rb_x = conv_4
+                    #Add the residual blocks to the model
+                    for i in range(num_resblock):
+                        en_rb_x = nf.resBlock(en_rb_x, model_params["conv_4"][2], scale=1, reuse=False, idx = i, initializer=init)
+                    en_rb_x = nf.convolution_layer(en_rb_x, model_params["conv_4"], [1,1,1,1], name="conv_5", activat_fn=None, initializer=init)
+                    en_rb_x += conv_4
+                    en_rb_x = tf.nn.relu(en_rb_x)
+
+                conv_5 = nf.convolution_layer(en_rb_x, model_params["conv_code"], [1,1,1,1], name="conv_5", padding='SAME')               
+                print("conv_5: %s" % conv_5.get_shape())
+                
+                code_layer = conv_5
+                print("Encoder: code layer's shape is %s" % code_layer.get_shape())
+                
+            return code_layer
+
+        if mode is "decoder": 
+            
+            code_layer = kwargs["code"]
+            print("Decoder: code layer's shape is %s" % code_layer.get_shape())
+            
+            deconv_5   = nf.lrelu(self.deconv2d("deconv_5", code_layer,                              ksize=3, stride=1, outshape=[tf.shape(self.inputs)[0], image_size[0]//16, image_size[1]//16, 64]))            
+            print("deconv_5: %s" % deconv_5.get_shape())            
+            
+            with tf.name_scope("decoder"):           
+    
+                with tf.variable_scope("decoder_resblock",reuse=False): 
+                    de_rb_x = deconv_5
+                    #Add the residual blocks to the model
+                    for i in range(num_resblock):
+                        de_rb_x = nf.resBlock(de_rb_x, model_params["conv_4"][2], scale=1, reuse=False, idx = i, initializer=init)
+                    de_rb_x = nf.convolution_layer(de_rb_x, model_params["conv_4"], [1,1,1,1], name="deconv_5", activat_fn=None, initializer=init)
+                    de_rb_x += deconv_5            
+                    de_rb_x = tf.nn.relu(de_rb_x)
+    
+                deconv_4   = nf.lrelu(self.deconv2d("deconv_4", de_rb_x,                              ksize=3, stride=2, outshape=[tf.shape(self.inputs)[0], image_size[0]//8, image_size[1]//8, 128]))            
+                # 91x91x8
+                print("deconv_4: %s" % deconv_4.get_shape())
+                
+                deconv_3_3 = nf.lrelu(self.deconv2d("deconv_3_3", deconv_4,                           ksize=3, stride=1, outshape=[tf.shape(self.inputs)[0], image_size[0]//8, image_size[1]//8, 128]))           
+                deconv_3_2 = nf.lrelu(self.deconv2d("deconv_3_2", deconv_3_3 + deconv_4,              ksize=3, stride=1, outshape=[tf.shape(self.inputs)[0], image_size[0]//8, image_size[1]//8, 128]))            
+                deconv_3_1 = nf.lrelu(self.deconv2d("deconv_3_1", deconv_3_2 + deconv_3_3 + deconv_4, ksize=3, stride=1, outshape=[tf.shape(self.inputs)[0], image_size[0]//8, image_size[1]//8, 128]))            
+                
+                deconv_3   = nf.lrelu(self.deconv2d("deconv_3", deconv_3_1 + deconv_3_2 + deconv_3_3 + deconv_4, ksize=3, stride=2, outshape=[tf.shape(self.inputs)[0], image_size[0]//4, image_size[1]//4, 128]))            
+                # 91x91x16  
+                print("deconv_3: %s" % deconv_3.get_shape())
+                
+                deconv_2   = nf.lrelu(self.deconv2d("deconv_2", deconv_3, ksize=5, stride=2, outshape=[tf.shape(self.inputs)[0], image_size[0]//2, image_size[1]//2, 64]))            
+                # 182x182x32  
+                print("deconv_2: %s" % deconv_2.get_shape())
+                
+                deconv_1   = nf.lrelu(self.deconv2d("deconv_1", deconv_2, ksize=11, stride=2, outshape=[tf.shape(self.inputs)[0], image_size[0], image_size[1], 1]))
+                print("output: %s" % deconv_1.get_shape())
+                
+            return deconv_1  
+
+    def baseline_end2end_2D_v2(self, kwargs):
+         
+        model_params = {
+        
+#            "conv_1": [11,11,4],
+#            "conv_2": [5,5,8],
+#
+#            "fc_code": 4096,            
+
+            "conv_1": [11,11,4],
+            "conv_2": [5,5,8],
+            "conv_3": [3,3,16],
+            
+            "conv_4": [3,3,16],
+                  
+            "deconv_4": [3,3,64],
+            "deconv_3": [3,3,128],
+            "deconv_2": [5,5,128],
+            "deconv_1": [11,11,64]
+        }
+
+        mode = kwargs["mode"]
+        
+        image_size = kwargs["image_size"]
+                
+        num_resblock = 16
+        
+        init = tf.random_normal_initializer(stddev=0.01)
+
+        if mode is "encoder":                
+            with tf.name_scope("encoder"):
+                print("input: %s" % self.inputs.get_shape())
+                
+#                conv_1 = nf.convolution_layer(self.inputs, model_params["conv_1"], [1,4,4,1], name="conv_1", padding='SAME')
+#                # 128x128x64
+#                print("conv_1: %s" % conv_1.get_shape())                
+#                
+#                conv_2 = nf.convolution_layer(conv_1, model_params["conv_2"], [1,2,2,1], name="conv_2", padding='SAME', flatten=True)
+#                # 64x64x128
+#                print("conv_2: %s" % conv_2.get_shape())
+#
+#                fc_code = nf.fc_layer(conv_2, model_params["fc_code"], name="fc_code", activat_fn=tf.nn.relu)
+#                print("fc_code: %s" % fc_code.get_shape())
+
+                conv_1 = nf.convolution_layer(self.inputs, model_params["conv_1"], [1,4,4,1], name="conv_1", padding='SAME', activat_fn=None)
+                # 128x128x64
+                print("conv_1: %s" % conv_1.get_shape())                
+                
+                conv_2 = nf.convolution_layer(conv_1, model_params["conv_2"], [1,2,2,1], name="conv_2", padding='SAME', activat_fn=None)
+                # 64x64x128
+                print("conv_2: %s" % conv_2.get_shape())
+
+                conv_3 = nf.convolution_layer(conv_2, model_params["conv_3"], [1,2,2,1], name="conv_3", padding='SAME', activat_fn=None)
+                # 64x64x128
+                print("conv_3: %s" % conv_3.get_shape())
+
+                code_layer = conv_3
+                print("Encoder: code layer's shape is %s" % code_layer.get_shape())
+
+#                conv_4 = nf.convolution_layer(conv_3, model_params["conv_4"], [1,2,2,1], name="conv_4", padding='SAME', activat_fn=None)
+#                # 64x64x128
+#                print("conv_4: %s" % conv_4.get_shape())
+#                
+#                code_layer = conv_4
+#                print("Encoder: code layer's shape is %s" % code_layer.get_shape())
+                
+            return code_layer
+
+        if mode is "decoder": 
+            
+            code_layer = kwargs["code"]
+            print("Decoder: code layer's shape is %s" % code_layer.get_shape())
+            
+            #code_layer = tf.reshape(code_layer, [tf.shape(self.inputs)[0], 16, 16, 16])
+            
+            #deconv_5   = nf.lrelu(self.deconv2d("deconv_5", code_layer,                              ksize=3, stride=1, outshape=[tf.shape(self.inputs)[0], image_size[0]//16, image_size[1]//16, 64]))                        
+            deconv_5   = nf.lrelu(self.deconv2d("deconv_5", code_layer,                              ksize=3, stride=2, outshape=[tf.shape(self.inputs)[0], image_size[0]//16, image_size[1]//16, 64]))            
+            print("deconv_5: %s" % deconv_5.get_shape())            
+            
+            with tf.name_scope("decoder"):           
+    
+                with tf.variable_scope("decoder_resblock",reuse=False): 
+                    de_rb_x = deconv_5
+                    #Add the residual blocks to the model
+                    for i in range(num_resblock):
+                        de_rb_x = nf.resBlock(de_rb_x, model_params["deconv_4"][2], scale=1, reuse=False, idx = i, initializer=init)
+                    de_rb_x = nf.convolution_layer(de_rb_x, model_params["deconv_4"], [1,1,1,1], name="deconv_5", activat_fn=None, initializer=init)
+                    de_rb_x += deconv_5            
+                    de_rb_x = tf.nn.relu(de_rb_x)
+    
+                deconv_4   = nf.lrelu(self.deconv2d("deconv_4", de_rb_x,                              ksize=3, stride=2, outshape=[tf.shape(self.inputs)[0], image_size[0]//8, image_size[1]//8, 128]))            
+                # 91x91x8
+                print("deconv_4: %s" % deconv_4.get_shape())
+                
+                deconv_3_3 = nf.lrelu(self.deconv2d("deconv_3_3", deconv_4,                           ksize=3, stride=1, outshape=[tf.shape(self.inputs)[0], image_size[0]//8, image_size[1]//8, 128]))           
+                deconv_3_2 = nf.lrelu(self.deconv2d("deconv_3_2", deconv_3_3 + deconv_4,              ksize=3, stride=1, outshape=[tf.shape(self.inputs)[0], image_size[0]//8, image_size[1]//8, 128]))            
+                deconv_3_1 = nf.lrelu(self.deconv2d("deconv_3_1", deconv_3_2 + deconv_3_3 + deconv_4, ksize=3, stride=1, outshape=[tf.shape(self.inputs)[0], image_size[0]//8, image_size[1]//8, 128]))            
+                
+                deconv_3   = nf.lrelu(self.deconv2d("deconv_3", deconv_3_1 + deconv_3_2 + deconv_3_3 + deconv_4, ksize=3, stride=2, outshape=[tf.shape(self.inputs)[0], image_size[0]//4, image_size[1]//4, 128]))            
+                # 91x91x16  
+                print("deconv_3: %s" % deconv_3.get_shape())
+                
+                deconv_2   = nf.lrelu(self.deconv2d("deconv_2", deconv_3, ksize=5, stride=2, outshape=[tf.shape(self.inputs)[0], image_size[0]//2, image_size[1]//2, 64]))            
+                # 182x182x32  
+                print("deconv_2: %s" % deconv_2.get_shape())
+                
+                deconv_1   = nf.lrelu(self.deconv2d("deconv_1", deconv_2, ksize=11, stride=2, outshape=[tf.shape(self.inputs)[0], image_size[0], image_size[1], 1]))
+                print("output: %s" % deconv_1.get_shape())
+                
+            return deconv_1  
+
     def build_model(self, kwargs = {}):
 
-        model_list = ["googleLeNet_v1", "resNet_v1", "baseline", "baseline_v2", "baseline_v3", "baseline_v4", "baseline_v5", "baseline_v5_flatten"]
+        #model_list = ["googleLeNet_v1", "resNet_v1", "baseline", "baseline_v2", "baseline_v3", "baseline_v4", "baseline_v5", "baseline_v5_flatten", "baseline_v6_flatten"]
+        
+        model_list = kwargs["model_list"]
         
         if self.model_ticket not in model_list:
             print("sorry, wrong ticket!")

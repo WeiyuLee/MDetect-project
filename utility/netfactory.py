@@ -17,19 +17,19 @@ def lrelu(x, name = "leaky", alpha = 0.2):
 #def lrelu(name,x, leak=0.2):
 #    return tf.maximum(x, leak * x, name=name)
 
-def convolution_layer(inputs, kernel_shape, stride, name, flatten = False ,padding = 'SAME',initializer=tf.contrib.layers.xavier_initializer(), activat_fn=tf.nn.relu, is_bn=False):
-                                                                                            #initializer=tf.contrib.layers.xavier_initializer()
+def convolution_layer(inputs, kernel_shape, stride, name, flatten = False ,padding = 'SAME',initializer=tf.contrib.layers.xavier_initializer(), activat_fn=tf.nn.relu, reg=None, is_bn=False):
+                                                                                         
     pre_shape = inputs.get_shape()[-1]
     rkernel_shape = [kernel_shape[0], kernel_shape[1], pre_shape, kernel_shape[2]]     
     
     with tf.variable_scope(name) as scope:
         
         try:
-            weight = tf.get_variable("weights",rkernel_shape, tf.float32, initializer=initializer)
+            weight = tf.get_variable("weights",rkernel_shape, tf.float32, initializer=initializer, regularizer=reg)
             bias = tf.get_variable("bias",kernel_shape[2], tf.float32, initializer=tf.zeros_initializer())
         except:
             scope.reuse_variables()
-            weight = tf.get_variable("weights",rkernel_shape, tf.float32, initializer=initializer)
+            weight = tf.get_variable("weights",rkernel_shape, tf.float32, initializer=initializer, regularizer=reg)
             bias = tf.get_variable("bias",kernel_shape[2], tf.float32, initializer=tf.zeros_initializer())
         
         net = tf.nn.conv2d(inputs, weight,stride, padding=padding)
@@ -43,19 +43,19 @@ def convolution_layer(inputs, kernel_shape, stride, name, flatten = False ,paddi
         
     return net
 
-def deconvolution_layer(inputs, kernel_shape, outshape, stride, name, flatten = False ,padding = 'SAME',initializer=tf.random_normal_initializer(stddev=0.01), activat_fn=lrelu, is_bn=False):
-                                                                                            #initializer=tf.contrib.layers.xavier_initializer()
+def deconvolution_layer(inputs, kernel_shape, outshape, stride, name, flatten = False ,padding = 'SAME',initializer=tf.random_normal_initializer(stddev=0.01), activat_fn=lrelu, reg=None, is_bn=False):
+                                                                                            
     pre_shape = inputs.get_shape()[-1]
     rkernel_shape = [kernel_shape[0], kernel_shape[1], kernel_shape[2], pre_shape]     
     
     with tf.variable_scope(name) as scope:
         
         try:
-            weight = tf.get_variable("weights", rkernel_shape, tf.float32, initializer=initializer)
+            weight = tf.get_variable("weights", rkernel_shape, tf.float32, initializer=initializer, regularizer=reg)
             bias = tf.get_variable("bias", kernel_shape[2], tf.float32, initializer=tf.zeros_initializer())
         except:
             scope.reuse_variables()
-            weight = tf.get_variable("weights", rkernel_shape, tf.float32, initializer=initializer)
+            weight = tf.get_variable("weights", rkernel_shape, tf.float32, initializer=initializer, regularizer=reg)
             bias = tf.get_variable("bias", kernel_shape[2], tf.float32, initializer=tf.zeros_initializer())
         
         net = tf.nn.conv2d_transpose(inputs, weight, outshape, stride, padding=padding)
@@ -74,7 +74,7 @@ def max_pool_layer(inputs, kernel_shape, stride, name=None, padding='VALID'):
            
     return tf.nn.max_pool(inputs, kernel_shape, stride, padding, name=name)
 
-def fc_layer(inputs, out_shape, name,initializer=tf.contrib.layers.xavier_initializer(), activat_fn=tf.nn.relu):
+def fc_layer(inputs, out_shape, name,initializer=tf.contrib.layers.xavier_initializer(), activat_fn=tf.nn.relu, reg=None):
     
     
     pre_shape = inputs.get_shape()[-1]
@@ -83,11 +83,11 @@ def fc_layer(inputs, out_shape, name,initializer=tf.contrib.layers.xavier_initia
         
         
         try:
-            weight = tf.get_variable("weights",[pre_shape, out_shape], tf.float32, initializer=initializer)
+            weight = tf.get_variable("weights",[pre_shape, out_shape], tf.float32, initializer=initializer, regularizer=reg)
             bias = tf.get_variable("bias",out_shape, tf.float32, initializer=initializer)
         except:
             scope.reuse_variables()
-            weight = tf.get_variable("weights",[pre_shape, out_shape], tf.float32, initializer=initializer)
+            weight = tf.get_variable("weights",[pre_shape, out_shape], tf.float32, initializer=initializer, regularizer=reg)
             bias = tf.get_variable("bias",out_shape, tf.float32, initializer=initializer)
         
         

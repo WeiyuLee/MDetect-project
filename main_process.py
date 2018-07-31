@@ -42,7 +42,9 @@ def main(_):
                                         ckpt_name=conf["ckpt_name"],
                                         log_dir=conf["log_dir"],
                                         output_dir=conf["output_dir"],
-                                        model_ticket=conf["model_ticket"])
+                                        model_ticket=conf["model_ticket"],
+                                        test_input_path=conf["inputroot"],
+                                        test_label_path=conf["labelroot"])
             
         elif conf["mode"] is "detection":
 
@@ -61,7 +63,10 @@ def main(_):
                                         log_dir=conf["log_dir"],
                                         output_dir=conf["output_dir"],
                                         model_ticket=conf["model_ticket"],
-                                        datasetroot=conf["datasetroot"])
+                                        train_root=conf["train_root"],
+                                        test_root=conf["test_root"],
+                                        train_code_root=conf["train_code_root"],
+                                        test_code_root=conf["test_code_root"])
             
         if conf["is_train"]:
             model.train()
